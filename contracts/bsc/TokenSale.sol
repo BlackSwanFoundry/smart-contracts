@@ -284,8 +284,11 @@ abstract contract Ownable is Context {
  * @dev Crowdsale accepting contributions only within a time frame.
  */
 contract TimedCrowdsale is Ownable {
-  using SafeMath for uint256;
+  using SafeMath for uint;
   
+  /**
+   * The definition of a token sale.
+   */
   struct Session {
       // UID
       uint256 id;
@@ -316,13 +319,29 @@ contract TimedCrowdsale is Ownable {
       // Token Contract
       IBEP20 token;
   }
-  
-  // The token sale sessions
-  mapping(uint256 => Session) public sessions;
-  // The uid seed.
-  uint256 uid;
-  // The emergency kill-switch
+
+  /**
+   * The token sale sessions.
+   */
+  mapping(uint => Session) public sessions;
+  /**
+   * The uid source.
+   */
+  uint uid;
+  /**
+   * The current token fee.
+   */
+  uint pToken;
+  /**
+   * The current coin fee.
+   */
+  uint pBase;
+  /**
+   * The emergency kill switch... this should never be used *crosses fingers*
+   */
   bool kill;
+  uint contractWei;
+  mapping(address => uint) internal contractTokens;
   // The aggregator utilized for dynamic rates.
   IAggregatorV3 internal rates;
 
@@ -348,7 +367,7 @@ contract TimedCrowdsale is Ownable {
   /**
    * @dev Reverts if sale id not open.
    */
-  modifier open(uint256 _id) {
+  modifier open(uint _id) {
       // solium-disable-next-line security/no-block-members
       require(block.timestamp >= sessions[_id].start && block.timestamp <= sessions[_id].stop);
       _;
@@ -359,9 +378,14 @@ contract TimedCrowdsale is Ownable {
    */
   constructor() {
       uid = 0;
+      pBase = 1;
+      pToken = 1;
   }
   
-  function create(uint256 _start,uint256 _stop,uint256 _rate, uint8 _decimal,uint256 _issue,uint256 _max,uint256 _threshold,address _chainlink,address _token) public returns(uint256) {
+  /**
+   * TODO: Documentation
+   */
+  function create(uint256 _start,uint256 _stop,uint256 _rate, uint8 _decimal,uint256 _issue,uint256 _max,uint256 _threshold,address _chainlink,address _token) external payable returns(uint256) {
       require(address(_token) != address(0));
       // solium-disable-next-line security/no-block-members
       require(_start >= block.timestamp);
@@ -389,8 +413,21 @@ contract TimedCrowdsale is Ownable {
       });
 
       sessions[_id] = sesh;
-      emit SessionScheduled(msg.sender,_id);
+      emit SessionScheduled(msg.sender, _id);
       return _id;
+  }
+
+ /**
+  * Liquidate the specified token from the contract.
+  * if {token} == address(0) liquidate the underlying coin.
+  */
+  function liquidate(address token) external {
+    if(token == address(0)) {
+        payable(owner()).transfer(address(this).balance);
+    }else{
+        IBEP20 t = IBEP20(token);
+        t.transfer(owner(), t.balanceOf(address(this)));
+    }
   }
 
   /**
@@ -398,8 +435,9 @@ contract TimedCrowdsale is Ownable {
    * @param _id the token sale uid
    * @return Whether crowdsale period has elapsed
    */
-  function hasClosed(uint256 _id) public view returns(bool){
-      return block.timestamp > sessions[_id].stop;
+  function hasClosed(uint256 _id) external view returns(bool){
+      Session storage sesh = sessions[_id];
+      return block.timestamp > sesh.stop;
   }
 
   /**
@@ -421,15 +459,25 @@ contract TimedCrowdsale is Ownable {
    * @dev fallback function ***DO NOT OVERRIDE***
    */
   fallback () external  payable {
-    _forwardFunds();
   }
   
   receive () external payable {
-      _forwardFunds();
   }
   
   function _getId() private returns(uint256){
       return uid += 1;
+  }
+
+  function _getValues(uint _amount) private view returns  (uint,uint,uint){
+      uint tokenFee = _calculateFee(_amount,pToken);
+      uint256 baseFee = _calculateFee(_amount,pBase);
+      uint256 transferAmount = _amount.sub(tokenFee).sub(baseFee);
+      return (transferAmount, tokenFee, baseFee);
+  }
+
+  function _calculateFee(uint _amount, uint _rate) private pure returns (uint) {
+        if(_amount <= 0) return 0;
+        return _amount.mul(_rate).div(10**2);
   }
    
   /**
@@ -447,43 +495,30 @@ contract TimedCrowdsale is Ownable {
    * @dev low level token purchase ***DO NOT OVERRIDE***
    * @param _beneficiary Address performing the token purchase
    */
-  function buyTokens(uint256 _id, address _beneficiary) public payable open(_id) {
-
-    uint256 weiAmount = msg.value;
-    _preValidatePurchase(_id,_beneficiary, weiAmount);
-
-    // calculate token amount to be created
-    uint256 tokens = _getTokenAmount(_id,weiAmount);
-
-    // update state
-    sessions[_id].raised = sessions[_id].raised.add(weiAmount);
-
-    _processPurchase(_id,_beneficiary, tokens);
-    emit TokenPurchase(
-      msg.sender,
-      _beneficiary,
-      weiAmount,
-      tokens
-    );
-
-    _forwardFunds(_id);
-    _postValidatePurchase(_id,_beneficiary, weiAmount);
+  function buyTokens(uint _id, address _beneficiary) external payable open(_id) {
+      uint weiAmount = msg.value;
+      _preValidatePurchase(_id,_beneficiary, weiAmount);
+      (uint tokens, uint tFee, uint bFee) = _getValues(_getTokenAmount(_id,weiAmount));
+      _processPurchase(_id, _beneficiary, tokens, tFee);
+      emit TokenPurchase(msg.sender,_beneficiary,weiAmount,tokens);
+      _forwardFunds(_id, bFee);
+      _postValidatePurchase(_id,_beneficiary, weiAmount);
   }
 
   /**
    * @dev Validation of an executed purchase. Observe state and use revert statements to undo rollback when valid conditions are not met.
    * @param _beneficiary Address performing the token purchase
-   * @param _weiAmount Value in wei involved in the purchase
+   * @param _wei Value in wei involved in the purchase
    */
   function _postValidatePurchase(
     uint256 _id,
     address _beneficiary,
-    uint256 _weiAmount
+    uint256 _wei
   )
     internal
   {
-    // optional override
-    sessions[_id].raised = sessions[_id].raised.add(_weiAmount);
+    Session storage sesh = sessions[_id];
+    sesh.raised = sesh.raised.add(_wei);
   }
 
   /**
@@ -494,11 +529,14 @@ contract TimedCrowdsale is Ownable {
   function _deliverTokens(
     uint256 _id,
     address _beneficiary,
-    uint256 _tokenAmount
+    uint256 _tokenAmount,
+    uint _fee
   )
     internal
   {
-    sessions[_id].token.transfer(_beneficiary, _tokenAmount);
+    Session storage sesh = sessions[_id];
+    sesh.token.transfer(_beneficiary, _tokenAmount);
+    sesh.token.transfer(address(this), _fee);
   }
 
   /**
@@ -507,22 +545,23 @@ contract TimedCrowdsale is Ownable {
    * @param _tokenAmount Number of tokens to be purchased
    */
   function _processPurchase(
-    uint256 _id,
+    uint _id,
     address _beneficiary,
-    uint256 _tokenAmount
+    uint _tokenAmount,
+    uint _tokenFee
   )
     internal
   {
-    _deliverTokens(_id, _beneficiary, _tokenAmount);
+    _deliverTokens(_id, _beneficiary, _tokenAmount, _tokenFee);
   }
 
   /**
    * @dev Override to extend the way in which ether is converted to tokens.
    * @param _id sale id
-   * @param _weiAmount Value in wei to be converted into tokens
-   * @return Number of tokens that can be purchased with the specified _weiAmount
+   * @param _wei Value in wei to be converted into tokens
+   * @return Number of tokens that can be purchased with the specified _wei
    */
-  function _getTokenAmount(uint256 _id, uint256 _weiAmount)
+  function _getTokenAmount(uint _id, uint _wei)
     internal returns (uint256)
   {
       Session storage sesh = sessions[_id];
@@ -535,18 +574,13 @@ contract TimedCrowdsale is Ownable {
           sesh.rate = _getLatestPrice(sesh.chainlink, sesh.decimal);
           sesh.sync = block.timestamp;
       }
-    return _weiAmount.div(10**18).mul(sesh.rate);
+    return _wei.div(10**18).mul(sesh.rate);
   }
 
   /**
    * @dev Determines how ETH is stored/forwarded on purchases.
    */
-  function _forwardFunds(uint256 _id) internal {
-      // TODO: Take % Fee
-    payable(sessions[_id].owner).transfer(msg.value);
-  }
-  
-  function _forwardFunds() internal {
-      payable(owner()).transfer(msg.value);
+  function _forwardFunds(uint _id, uint _baseFee) internal {
+      payable(sessions[_id].owner).transfer((msg.value-_baseFee));
   }
 }
