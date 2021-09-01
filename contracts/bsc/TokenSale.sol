@@ -138,6 +138,9 @@ library SafeMath {
   }
 }
 
+/**
+ * Chainlink Aggregator interface.
+ */
 interface IAggregatorV3 {
 
   function decimals()
