@@ -327,22 +327,22 @@ contract TimedCrowdsale is Ownable {
   /**
    * The uid source.
    */
-  uint uid;
+  uint internal uid;
   /**
    * The current token fee.
    */
-  uint pToken;
+  uint internal pToken;
   /**
    * The current coin fee.
    */
-  uint pBase;
+  uint internal pCoin;
   /**
    * The emergency kill switch... this should never be used *crosses fingers*
    */
-  bool kill;
-  uint contractWei;
-  mapping(address => uint) internal contractTokens;
-  // The aggregator utilized for dynamic rates.
+  bool internal kill;
+  /**
+   * The chainlink aggregator for the contract.
+   */
   IAggregatorV3 internal rates;
 
   /**
@@ -378,7 +378,7 @@ contract TimedCrowdsale is Ownable {
    */
   constructor() {
       uid = 0;
-      pBase = 1;
+      pCoin = 1;
       pToken = 1;
   }
   
@@ -421,13 +421,31 @@ contract TimedCrowdsale is Ownable {
   * Liquidate the specified token from the contract.
   * if {token} == address(0) liquidate the underlying coin.
   */
-  function liquidate(address token) external {
+  function liquidate(address token) external onlyOwner {
     if(token == address(0)) {
         payable(owner()).transfer(address(this).balance);
     }else{
         IBEP20 t = IBEP20(token);
         t.transfer(owner(), t.balanceOf(address(this)));
     }
+  }
+
+  /**
+   * Set the applied contract fee for coins.
+   */
+  function setCoinFee(uint coinFee) external onlyOwner {
+      if(coinFee > 0) {
+        pCoin = coinFee;
+      }
+  }
+
+  /**
+   * Set the applied contract fee for tokens.
+   */
+  function setTokenFee(uint tokenFee) external onlyOwner {
+      if(tokenFee > 0) {
+        pToken = tokenFee;
+      }
   }
 
   /**
@@ -468,10 +486,14 @@ contract TimedCrowdsale is Ownable {
       return uid += 1;
   }
 
+  /**
+   * Returns the fee adjusted transfer amount, and applied fees.
+   * @param {uint} _amount of wei involved in token purchase.
+   */
   function _getValues(uint _amount) private view returns  (uint,uint,uint){
       uint tokenFee = _calculateFee(_amount,pToken);
-      uint256 baseFee = _calculateFee(_amount,pBase);
-      uint256 transferAmount = _amount.sub(tokenFee).sub(baseFee);
+      uint baseFee = _calculateFee(_amount,pCoin);
+      uint transferAmount = _amount.sub(tokenFee).sub(baseFee);
       return (transferAmount, tokenFee, baseFee);
   }
 
