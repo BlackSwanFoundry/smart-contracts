@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./interfaces/IBEP20.sol";
-import "../utils/Ownable.sol";
-import "../utils/math/SafeMath.sol";
-import "../utils/aggregators/IAggregatorV3.sol";
+import "../tokens/IBEP20.sol";
+import "../../utils/Ownable.sol";
+import "../../utils/math/SafeMath.sol";
+import "../../utils/aggregators/IAggregatorV3.sol";
 
   /**
    * @dev The definition of a token sale.
