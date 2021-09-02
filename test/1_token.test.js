@@ -3,15 +3,16 @@ const {expect} = require("chai");
 const { BN, expectEvent, expectRevert, constants } = require('@openzeppelin/test-helpers');
 
 // Contracts
-const SimpleToken = artifacts.require("bsc/SimpleToken");
+const SimpleToken = artifacts.require("bsc/tokens/BEP20");
 
-contract("SimpleToken", function([creator, other]){
+contract("BEP20", function([creator, other]){
     const _name = "SimpleToken";
     const _symb = "SIMP"
     const _supp = new BN('10000000000000000000000');
+    const _deci = 9;
 
     beforeEach(async function(){
-        this.token = await SimpleToken.new(_name, _sym, _supp, { from: creator });
+        this.token = await SimpleToken.new(_name, _sym, _supp, _deci, { from: creator });
     });
 
     it("Has total supply", async function(){
@@ -25,6 +26,10 @@ contract("SimpleToken", function([creator, other]){
 
     it('Has a symbol', async function () {
         expect(await this.token.symbol()).to.be.equal(_symb);
+    });
+
+    it('Has specified decimals', async function() {
+        expect(await this.token.decimals()).to.be.equal(_deci);
     });
 
     it('Assigns the initial total supply to the creator', async function () {

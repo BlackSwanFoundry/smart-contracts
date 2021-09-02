@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-import "./IBEP20Metadata.sol";
-import "../../utils/Context.sol";
+import "./IBEP20.sol";
+import "../../utils/Ownable.sol";
 
 /**
  * @dev Implementation of the {IBEP20} interface.
@@ -30,7 +30,7 @@ import "../../utils/Context.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IBEP20-approve}.
  */
-abstract contract BEP20 is Context, IBEP20Metadata {
+contract BEP20 is Ownable, IBEP20 {
 
     mapping(address => uint) private _balances;
 
@@ -62,7 +62,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
     /**
      * @dev Returns the name of the token.
      */
-    function name() public view virtual override returns (string memory) {
+    function name() external view virtual override returns (string memory) {
         return _name;
     }
 
@@ -70,7 +70,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
      */
-    function symbol() public view virtual override returns (string memory) {
+    function symbol() external view virtual override returns (string memory) {
         return _symbol;
     }
 
@@ -87,21 +87,28 @@ abstract contract BEP20 is Context, IBEP20Metadata {
      * no way affects any of the arithmetic of the contract, including
      * {IBEP20-balanceOf} and {IBEP20-transfer}.
      */
-    function decimals() public view virtual override returns (uint8) {
+    function decimals() external view virtual override returns (uint8) {
         return 18;
+    }
+
+    /**
+     * @dev Returns the bep token owner.
+     */
+    function getOwner() external view virtual override returns (address){
+        return owner();
     }
 
     /**
      * @dev See {IBEP20-totalSupply}.
      */
-    function totalSupply() public view virtual override returns (uint256) {
+    function totalSupply() external view virtual override returns (uint256) {
         return _totalSupply;
     }
 
     /**
      * @dev See {IBEP20-balanceOf}.
      */
-    function balanceOf(address account) public view virtual override returns (uint256) {
+    function balanceOf(address account) external view virtual override returns (uint256) {
         return _balances[account];
     }
 
@@ -113,7 +120,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
+    function transfer(address recipient, uint256 amount) external virtual override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -121,7 +128,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
     /**
      * @dev See {IBEP20-allowance}.
      */
-    function allowance(address owner, address spender) public view virtual override returns (uint256) {
+    function allowance(address owner, address spender) external view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -132,7 +139,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+    function approve(address spender, uint256 amount) external virtual override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -154,7 +161,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
         address sender,
         address recipient,
         uint256 amount
-    ) public virtual override returns (bool) {
+    ) external virtual override returns (bool) {
         _transfer(sender, recipient, amount);
 
         uint256 currentAllowance = _allowances[sender][_msgSender()];
@@ -178,7 +185,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+    function increaseAllowance(address spender, uint256 addedValue) external virtual returns (bool) {
         _approve(_msgSender(), spender, _allowances[_msgSender()][spender] + addedValue);
         return true;
     }
@@ -197,7 +204,7 @@ abstract contract BEP20 is Context, IBEP20Metadata {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+    function decreaseAllowance(address spender, uint256 subtractedValue) external virtual returns (bool) {
         uint256 currentAllowance = _allowances[_msgSender()][spender];
         require(currentAllowance >= subtractedValue, "BEP20: decreased allowance below zero");
         unchecked {
