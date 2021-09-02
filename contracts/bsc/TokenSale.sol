@@ -325,6 +325,10 @@ contract TimedCrowdsale is Ownable {
    */
   mapping(uint => Session) public sessions;
   /**
+   * @dev The token sale contract sessions, reverse lookup.
+   */
+  mapping(address => uint) private tokenSessions;
+  /**
    * @dev The uid source.
    */
   uint internal uid;
@@ -371,8 +375,21 @@ contract TimedCrowdsale is Ownable {
    * @dev Reverts if sale id not open.
    */
   modifier open(uint _id) {
+      require(!kill);
       // solium-disable-next-line security/no-block-members
       require(block.timestamp >= sessions[_id].start && block.timestamp <= sessions[_id].stop);
+      _;
+  }
+
+  modifier notExists(address _token) {
+      uint _cid = 0;
+      _cid = tokenSessions[_token];
+      if(_cid > 0){
+        Session storage sesh = sessions[_cid];
+        if(bytes(sesh).length > 0){
+          require(block.timestamp >= sesh.stop);
+        }
+      }
       _;
   }
 
@@ -380,23 +397,34 @@ contract TimedCrowdsale is Ownable {
    * @dev Constructor, takes crowdsale opening and closing times.
    */
   constructor() {
-      uid = 0;
-      pCoin = 1;
-      pToken = 1;
+      uid = 0;    // Seed 0.
+      pCoin = 1;  // Default 1%
+      pToken = 1; // Default 1%
   }
   
   /**
    * TODO: Documentation
    */
-  function create(uint256 _start,uint256 _stop,uint256 _rate, uint8 _decimal,uint256 _issue,uint256 _max,uint256 _threshold,address _chainlink,address _token) external payable returns(uint256) {
+  function create(uint256 _start,
+  uint256 _stop,
+  uint256 _rate, 
+  uint8 _decimal,
+  uint256 _issue,
+  uint256 _max,
+  uint256 _threshold,
+  address _chainlink,
+  address _token) 
+  external 
+  payable 
+  notExists(_token) 
+  returns(uint256) {
       require(address(_token) != address(0));
       // solium-disable-next-line security/no-block-members
       require(_start >= block.timestamp);
       require(_stop > _start);
       require(_rate >= 0 || _chainlink != address(0));
       
-      uint256 _id = _getId();
-      // TODO: Check for existing contract for token, ensure no date collisions.
+      uint _id = _getId();
       
       Session memory sesh = Session({
           id: _id,
@@ -416,6 +444,8 @@ contract TimedCrowdsale is Ownable {
       });
 
       sessions[_id] = sesh;
+      tokenSessions[_token] = _id;
+      
       emit SessionScheduled(msg.sender, _id);
       return _id;
   }
@@ -431,6 +461,13 @@ contract TimedCrowdsale is Ownable {
         IBEP20 t = IBEP20(token);
         t.transfer(owner(), t.balanceOf(address(this)));
     }
+  }
+
+  /**
+   * @dev Lock / Unlock contract with kill switch, only to be used in emergencies.
+   */
+  function lock(bool _lock) external onlyOwner {
+      kill = _lock;
   }
 
   /**
@@ -562,8 +599,7 @@ contract TimedCrowdsale is Ownable {
     internal
   {
     Session storage sesh = sessions[_id];
-    sesh.token.transfer(_beneficiary, _tokenAmount);
-    sesh.token.transfer(address(this), _fee);
+    sesh.token.transfer(_beneficiary, (_tokenAmount - _fee));
   }
 
   /**
