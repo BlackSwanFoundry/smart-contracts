@@ -287,7 +287,7 @@ contract TimedCrowdsale is Ownable {
   using SafeMath for uint;
   
   /**
-   * The definition of a token sale.
+   * @dev The definition of a token sale.
    */
   struct Session {
       // UID
@@ -321,32 +321,32 @@ contract TimedCrowdsale is Ownable {
   }
 
   /**
-   * The token sale sessions.
+   * @dev The token sale sessions.
    */
   mapping(uint => Session) public sessions;
   /**
-   * The uid source.
+   * @dev The uid source.
    */
   uint internal uid;
   /**
-   * The current token fee.
+   * @dev The current token fee.
    */
   uint internal pToken;
   /**
-   * The current coin fee.
+   * @dev The current coin fee.
    */
   uint internal pCoin;
   /**
-   * The emergency kill switch... this should never be used *crosses fingers*
+   * @dev The emergency kill switch... this should never be used *crosses fingers*
    */
   bool internal kill;
   /**
-   * The chainlink aggregator for the contract.
+   * @dev The chainlink aggregator for the contract.
    */
   IAggregatorV3 internal rates;
 
   /**
-   * Event for token purchase logging
+   * @dev Event for token purchase logging
    * @param purchaser who paid for the tokens
    * @param beneficiary who got the tokens
    * @param value weis paid for purchase
@@ -359,6 +359,9 @@ contract TimedCrowdsale is Ownable {
     uint256 amount
   );
   
+  /**
+   * TODO: Documentation
+   */
   event SessionScheduled(
       address indexed creator,
       uint256 id
@@ -418,7 +421,7 @@ contract TimedCrowdsale is Ownable {
   }
 
  /**
-  * Liquidate the specified token from the contract.
+  * @dev Liquidate the specified token from the contract.
   * if {token} == address(0) liquidate the underlying coin.
   */
   function liquidate(address token) external onlyOwner {
@@ -431,7 +434,7 @@ contract TimedCrowdsale is Ownable {
   }
 
   /**
-   * Set the applied contract fee for coins.
+   * @dev Set the applied contract fee for coins.
    */
   function setCoinFee(uint coinFee) external onlyOwner {
       if(coinFee > 0) {
@@ -440,7 +443,7 @@ contract TimedCrowdsale is Ownable {
   }
 
   /**
-   * Set the applied contract fee for tokens.
+   * @dev Set the applied contract fee for tokens.
    */
   function setTokenFee(uint tokenFee) external onlyOwner {
       if(tokenFee > 0) {
@@ -469,25 +472,27 @@ contract TimedCrowdsale is Ownable {
     require(_weiAmount != 0);
   }
   
-  // -----------------------------------------
-  // Crowdsale external interface
-  // -----------------------------------------
-
   /**
    * @dev fallback function ***DO NOT OVERRIDE***
    */
   fallback () external  payable {
   }
   
+  /**
+   * @dev receive function ***DO NOT OVERRIDE***
+   */
   receive () external payable {
   }
   
+  /**
+   * @dev Returns the next unique id in the sequence.
+   */
   function _getId() private returns(uint256){
       return uid += 1;
   }
 
   /**
-   * Returns the fee adjusted transfer amount, and applied fees.
+   * @dev Returns the fee adjusted transfer amount, and applied fees.
    * @param {uint} _amount of wei involved in token purchase.
    */
   function _getValues(uint _amount) private view returns  (uint,uint,uint){
@@ -503,7 +508,7 @@ contract TimedCrowdsale is Ownable {
   }
    
   /**
-   * Returns the latest rate price.
+   * @dev Returns the latest rate price.
    * @param {address} _chainlink  aggregator contract address.
    * @param {int8}  _decimal integer to normalize to a desired fiat increment
    */
