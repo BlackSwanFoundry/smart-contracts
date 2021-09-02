@@ -6,29 +6,32 @@ const { BN, expectEvent, expectRevert, constants } = require('@openzeppelin/test
 const SimpleToken = artifacts.require("bsc/SimpleToken");
 const TokenSale = artifacts.require("bsc/TokenSale");
 
-contract("SimpleToken", function([creator, other]){
-    const _name = "SimpleToken";
-    const _symb = "SIMP"
-    const _supp = new BN(100);
+// Start test block
+contract('TokenSale', function ([ creator, investor, wallet ]) {
 
-    beforeEach(async function(){
-        this.token = await SimpleToken.new(_name, _sym, _supp, { from: creator });
+    const NAME = 'SimpleToken';
+    const SYMBOL = 'SIMP';
+    const TOTAL_SUPPLY = new BN('10000000000000000000000');
+    const RATE = new BN(10);
+  
+    beforeEach(async function () {
+      this.token = await SimpleToken.new(NAME, SYMBOL, TOTAL_SUPPLY, { from: creator });
+      this.crowdsale = await SimpleCrowdsale.new(RATE, wallet, this.token.address);
+      this.token.transfer(this.crowdsale.address, await this.token.totalSupply());
     });
-
-    it("Has total supply", async function(){
-        // Use large integer comparisons
-        expect(await this.token.totalSupply()).to.be.bignumber.equal(_supp);
+  
+    it('should create crowdsale with correct parameters', async function () {
+      expect(await this.crowdsale.rate()).to.be.bignumber.equal(RATE);
+      expect(await this.crowdsale.wallet()).to.be.equal(wallet);
+      expect(await this.crowdsale.token()).to.be.equal(this.token.address);
     });
-
-    it("Has a name", async function(){
-        expect(await this.token.name()).to.be.equal(_name);
+  
+    it('should accept payments', async function () {
+      const investmentAmount = ether('1');
+      const expectedTokenAmount = RATE.mul(investmentAmount);
+  
+      await this.crowdsale.buyTokens(investor, { value: investmentAmount, from: investor });
+  
+      expect(await this.token.balanceOf(investor)).to.be.bignumber.equal(expectedTokenAmount);
     });
-
-    it('Has a symbol', async function () {
-        expect(await this.token.symbol()).to.be.equal(_symb);
-    });
-
-    it('Assigns the initial total supply to the creator', async function () {
-        expect(await this.token.balanceOf(creator)).to.be.bignumber.equal(TOTAL_SUPPLY);
-    });
-});
+  });
