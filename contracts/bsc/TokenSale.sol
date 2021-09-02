@@ -386,9 +386,7 @@ contract TimedCrowdsale is Ownable {
       _cid = tokenSessions[_token];
       if(_cid > 0){
         Session storage sesh = sessions[_cid];
-        if(bytes(sesh).length > 0){
-          require(block.timestamp >= sesh.stop);
-        }
+        require(block.timestamp >= sesh.stop);
       }
       _;
   }
@@ -512,14 +510,12 @@ contract TimedCrowdsale is Ownable {
   /**
    * @dev fallback function ***DO NOT OVERRIDE***
    */
-  fallback () external  payable {
-  }
+  fallback () external  payable {}
   
   /**
    * @dev receive function ***DO NOT OVERRIDE***
    */
-  receive () external payable {
-  }
+  receive () external payable {}
   
   /**
    * @dev Returns the next unique id in the sequence.
