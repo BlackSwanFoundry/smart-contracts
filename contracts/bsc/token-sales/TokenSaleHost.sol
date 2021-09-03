@@ -6,6 +6,13 @@ import "../../utils/Ownable.sol";
 import "../../utils/math/SafeMath.sol";
 import "../../utils/aggregators/IAggregatorV3.sol";
 
+/**
+ * @title TokenSaleHost
+ * @dev Host contract from token "crowd" sales.
+ */
+contract TokenSaleHost is Ownable {
+  using SafeMath for uint;
+
   /**
    * @dev The definition of a token sale.
    */
@@ -16,45 +23,45 @@ import "../../utils/aggregators/IAggregatorV3.sol";
       uint256 start;
       // Timestamp the sale stops
       uint256 stop;
-      // Last rate sync timestamp
-      uint256 sync;
-      // Current Rate
-      uint256 rate;
-      // Rate normalization: rate / 10**{decimal}
-      uint8 decimal;
       // Current TOKEN|BNB Rate
       uint256 issue;
-      // WEI raised
-      uint256 raised;
-      // Maximum sale quantity
-      uint256 max;
-      // Total tokens sold
-      uint256 sold;
-      // Total minutes before bnb rate update
-      uint256 threshold;
-      // Contract address of chainlink aggregator
-      address chainlink;
       // Token Sale Owner
       address owner;
       // Token Contract
       IBEP20 token;
   }
 
-/**
- * @title TokenSaleHost
- * @dev Host contract from token "crowd" sales.
- */
-contract TokenSaleHost is Ownable {
-  using SafeMath for uint;
+  struct SessionMetadata{
+      // Last rate sync timestamp
+      uint256 sync;
+      // Current Rate
+      uint256 rate;
+      // Rate normalization: rate / 10**{decimal}
+      uint8 decimal;
+      // Contract address of chainlink aggregator
+      address chainlink;
+      // WEI raised
+      uint256 raised;
+      // Total tokens sold
+      uint256 sold;
+      // Total minutes before bnb rate update
+      uint256 threshold;
+      // Maximum sale quantity
+      uint256 max;
+  }
 
   /**
    * @dev The token sale sessions.
    */
   mapping(uint => Session) public sessions;
   /**
+   * @dev The metadata for each session.
+   */
+  mapping(uint => SessionMetadata) public metadata;
+  /**
    * @dev The token sale contract sessions, reverse lookup.
    */
-  mapping(address => uint) private tokenSessions;
+  mapping(address => uint) private tokens;
   /**
    * @dev The uid source.
    */
@@ -110,10 +117,20 @@ contract TokenSaleHost is Ownable {
 
   modifier notExists(address _token) {
       uint _cid = 0;
-      _cid = tokenSessions[_token];
+      _cid = tokens[_token];
       if(_cid > 0){
         Session storage sesh = sessions[_cid];
         require(block.timestamp >= sesh.stop);
+      }
+      _;
+  }
+
+  modifier notMaxed(address _token) {
+    uint _cid = 0;
+      _cid = tokens[_token];
+      if(_cid > 0){
+        SessionMetadata storage meta = metadata[_cid];
+        require(meta.sold < meta.max);
       }
       _;
   }
@@ -155,21 +172,25 @@ contract TokenSaleHost is Ownable {
           id: _id,
           start: _start,
           stop: _stop,
-          sync: uint256(0),
-          rate: _rate,
-          decimal: _decimal,
           issue: _issue,
-          max: _max,
-          sold: uint256(0),
-          raised: uint256(0),
-          threshold: _threshold,
-          chainlink: _chainlink,
           owner: msg.sender,
           token: IBEP20(_token)
       });
 
+      SessionMetadata memory meta = SessionMetadata({
+          sync: uint256(0),
+          rate: _rate,
+          decimal: _decimal,
+          max: _max,
+          sold: uint256(0),
+          raised: uint256(0),
+          threshold: _threshold,
+          chainlink: _chainlink
+      });
+
       sessions[_id] = sesh;
-      tokenSessions[_token] = _id;
+      metadata[_id] = meta;
+      tokens[_token] = _id;
       
       emit SessionScheduled(msg.sender, _id);
       return _id;
@@ -285,9 +306,9 @@ contract TokenSaleHost is Ownable {
   function buyTokens(uint _id, address _beneficiary) external payable open(_id) {
       uint weiAmount = msg.value;
       _preValidatePurchase(_id,_beneficiary, weiAmount);
-      (uint tokens, uint tFee, uint bFee) = _getValues(_getTokenAmount(_id,weiAmount));
-      _processPurchase(_id, _beneficiary, tokens, tFee);
-      emit TokenPurchase(msg.sender,_beneficiary,weiAmount,tokens);
+      (uint tTokens, uint tFee, uint bFee) = _getValues(_getTokenAmount(_id,weiAmount));
+      _processPurchase(_id, _beneficiary, tTokens, tFee);
+      emit TokenPurchase(msg.sender,_beneficiary,weiAmount,tTokens);
       _forwardFunds(_id, bFee);
       _postValidatePurchase(_id,_beneficiary, weiAmount);
   }
@@ -304,8 +325,8 @@ contract TokenSaleHost is Ownable {
   )
     internal
   {
-    Session storage sesh = sessions[_id];
-    sesh.raised = sesh.raised.add(_wei);
+    SessionMetadata storage meta = metadata[_id];
+    meta.raised = meta.raised.add(_wei);
   }
 
   /**
@@ -350,17 +371,17 @@ contract TokenSaleHost is Ownable {
   function _getTokenAmount(uint _id, uint _wei)
     internal returns (uint256)
   {
-      Session storage sesh = sessions[_id];
-      if(sesh.rate > 0 && sesh.sync > 0){
-          if((block.timestamp - sesh.sync).div(1000).div(60) >= sesh.threshold){
-              sesh.rate = _getLatestPrice(sesh.chainlink, sesh.decimal);
-              sesh.sync = block.timestamp;
+      SessionMetadata storage meta = metadata[_id];
+      if(meta.rate > 0 && meta.sync > 0){
+          if((block.timestamp - meta.sync).div(1000).div(60) >= meta.threshold){
+              meta.rate = _getLatestPrice(meta.chainlink, meta.decimal);
+              meta.sync = block.timestamp;
           }
       }else{
-          sesh.rate = _getLatestPrice(sesh.chainlink, sesh.decimal);
-          sesh.sync = block.timestamp;
+          meta.rate = _getLatestPrice(meta.chainlink, meta.decimal);
+          meta.sync = block.timestamp;
       }
-    return _wei.div(10**18).mul(sesh.rate);
+    return _wei.div(10**18).mul(meta.rate);
   }
 
   /**
