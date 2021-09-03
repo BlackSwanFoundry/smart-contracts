@@ -11,19 +11,19 @@ contract('TokenSale', function ([ creator, investor, wallet ]) {
 
     const NAME = 'SimpleToken';
     const SYMBOL = 'SIMP';
-    const TOTAL_SUPPLY = new BN('10000000000000000000000');
-    const RATE = new BN(10);
+    const TOTAL_SUPPLY = new BN(100);
+    const RATE = new BN(1);
   
     beforeEach(async function () {
       this.token = await Token.new(NAME, SYMBOL, TOTAL_SUPPLY, { from: creator });
-      this.tokenSale = await TokenSale.new(RATE, wallet, this.token.address);
+      this.tokenSale = await TokenSale.new(RATE, wallet, this.token.address, {from: creator});
       this.token.transfer(this.crowdsale.address, await this.token.totalSupply());
     });
   
     it('should create crowdsale with correct parameters', async function () {
-      expect(await this.tokenSale.rate()).to.be.bignumber.equal(RATE);
-      expect(await this.tokenSale.wallet()).to.be.equal(wallet);
-      expect(await this.tokenSale.token()).to.be.equal(this.token.address);
+      expect(await this.tokenSale.rate).to.be.bignumber.equal(RATE);
+      expect(await this.tokenSale.wallet).to.be.equal(wallet);
+      expect(await this.tokenSale.token).to.be.equal(this.token.address);
     });
   
     it('should accept payments', async function () {

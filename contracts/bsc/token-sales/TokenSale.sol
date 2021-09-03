@@ -50,14 +50,14 @@ contract TokenSale {
    * @param _wallet Address where collected funds will be forwarded to
    * @param _token Address of the token being sold
    */
-  constructor(uint _rate, address _wallet, IBEP20 _token) {
+  constructor(uint _rate, address _wallet, address _token) {
     require(_rate > 0);
     require(_wallet != address(0));
-    require(address(_token) != address(0));
+    require(_token != address(0));
 
     rate = _rate;
     wallet = _wallet;
-    token = _token;
+    token = IBEP20(_token);
   }
 
   // -----------------------------------------
