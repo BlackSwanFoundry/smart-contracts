@@ -36,8 +36,7 @@ contract BEP20 is Ownable, IBEP20 {
 
     mapping(address => mapping(address => uint)) private _allowances;
 
-    uint private _decimals;
-    uint private _initialSupply;
+    uint8 private _decimals;
     uint private _totalSupply;
 
     string private _name;
@@ -52,11 +51,12 @@ contract BEP20 is Ownable, IBEP20 {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_, uint supply_, uint decimals_) {
+    constructor(string memory name_, string memory symbol_, uint supply_, uint8 decimals_) {
         _name = name_;
         _symbol = symbol_;
-        _initialSupply = supply_;
+        _totalSupply = supply_;
         _decimals = decimals_;
+        _balances[_msgSender()] = _totalSupply;
     }
 
     /**
@@ -88,7 +88,7 @@ contract BEP20 is Ownable, IBEP20 {
      * {IBEP20-balanceOf} and {IBEP20-transfer}.
      */
     function decimals() external view virtual override returns (uint8) {
-        return 18;
+        return _decimals;
     }
 
     /**

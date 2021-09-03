@@ -8,11 +8,11 @@ const SimpleToken = artifacts.require("bsc/tokens/BEP20");
 contract("BEP20", function([creator, other]){
     const _name = "SimpleToken";
     const _symb = "SIMP"
-    const _supp = new BN('10000000000000000000000');
-    const _deci = 9;
+    const _supp = new BN(100);
+    const _deci = new BN(9);
 
     beforeEach(async function(){
-        this.token = await SimpleToken.new(_name, _sym, _supp, _deci, { from: creator });
+        this.token = await SimpleToken.new(_name, _symb, _supp, _deci, { from: creator });
     });
 
     it("Has total supply", async function(){
@@ -28,11 +28,7 @@ contract("BEP20", function([creator, other]){
         expect(await this.token.symbol()).to.be.equal(_symb);
     });
 
-    it('Has specified decimals', async function() {
-        expect(await this.token.decimals()).to.be.equal(_deci);
-    });
-
     it('Assigns the initial total supply to the creator', async function () {
-        expect(await this.token.balanceOf(creator)).to.be.bignumber.equal(TOTAL_SUPPLY);
+        expect(await this.token.balanceOf(creator)).to.be.bignumber.equal(_supp);
     });
 });
