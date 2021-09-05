@@ -1,34 +1,35 @@
 // Helpers
 const {expect} = require("chai");
-const { BN, expectEvent, expectRevert, constants } = require('@openzeppelin/test-helpers');
+const { BN, ether } = require('@openzeppelin/test-helpers');
 
 // Contracts
 const Token = artifacts.require("bsc/tokens/BEP20");
 const TokenSale = artifacts.require("bsc/token-sales/TokenSale");
 
 // Start test block
-contract('TokenSale', function ([ creator, investor, wallet ]) {
+contract('TokenSale', function ([ creator, investor ]) {
 
-    const NAME = 'SimpleToken';
-    const SYMBOL = 'SIMP';
-    const TOTAL_SUPPLY = new BN(100);
-    const RATE = new BN(1);
+    const _name = 'SimpleToken';
+    const _symbol = 'SIMP';
+    const _supply = new BN(100);
+    const _rate = new BN(1);
+    const _deci = new BN(9);
   
     beforeEach(async function () {
-      this.token = await Token.new(NAME, SYMBOL, TOTAL_SUPPLY, { from: creator });
-      this.tokenSale = await TokenSale.new(RATE, wallet, this.token.address, {from: creator});
-      this.token.transfer(this.crowdsale.address, await this.token.totalSupply());
+      this.token = await Token.new(_name, _symbol, _supply, _deci, { from: creator });
+      this.tokenSale = await TokenSale.new(_rate, creator, this.token.address, {from: creator});
+      this.token.transfer(this.tokenSale.address, await this.token.totalSupply());
     });
   
     it('should create crowdsale with correct parameters', async function () {
-      expect(await this.tokenSale.rate).to.be.bignumber.equal(RATE);
+      expect(await this.tokenSale.rate).to.be.bignumber.equal(_rate);
       expect(await this.tokenSale.wallet).to.be.equal(wallet);
-      expect(await this.tokenSale.token).to.be.equal(this.token.address);
+      expect(await this.tokenSale.token.address).to.be.equal(this.token.address);
     });
   
     it('should accept payments', async function () {
       const investmentAmount = ether('1');
-      const expectedTokenAmount = RATE.mul(investmentAmount);
+      const expectedTokenAmount = _rate.mul(investmentAmount);
   
       await this.tokenSale.buyTokens(investor, { value: investmentAmount, from: investor });
   
