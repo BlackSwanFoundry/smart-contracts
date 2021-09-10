@@ -20,7 +20,7 @@ contract TokenSale {
   using SafeMath for uint;
 
   // The token being sold
-  IBEP20 public token;
+  address public token;
 
   // Address where funds are collected
   address public wallet;
@@ -57,7 +57,7 @@ contract TokenSale {
 
     rate = _rate;
     wallet = _wallet;
-    token = IBEP20(_token);
+    token = _token;
   }
 
   // -----------------------------------------
@@ -149,7 +149,7 @@ contract TokenSale {
   )
     internal
   {
-    token.transfer(_beneficiary, _tokenAmount);
+    IBEP20(token).transfer(_beneficiary, _tokenAmount);
   }
 
   /**
