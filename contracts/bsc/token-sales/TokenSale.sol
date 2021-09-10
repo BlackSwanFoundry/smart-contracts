@@ -188,7 +188,7 @@ contract TokenSale {
   function _getTokenAmount(uint _weiAmount)
     internal view returns (uint)
   {
-    return _weiAmount.mul(rate);
+    return _weiAmount.mul(rate).div(10**15);
   }
 
   /**
