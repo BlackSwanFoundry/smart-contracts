@@ -9,7 +9,7 @@ import "../../utils/Claimable.sol";
 contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
     using SafeMath for uint;
 
-    event Multisended(uint total, address tokenAddress);
+    event DropSent(uint total, address tokenAddress);
     event ClaimedTokens(address token, address owner, uint balance);
 
     modifier hasFee() {
@@ -23,7 +23,7 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
     fallback() external payable{}
 
     function initialize(address _owner) public {
-        require(!initialized());
+        require(!_initialized());
         transferOwnership(_owner);
         setArrayLimit(200);
         setDiscountStep(0.00005 ether);
@@ -31,34 +31,50 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
         boolStorage[keccak256("bsf_drop_init")] = true;
     }
 
-    function initialized() public view returns (bool) {
+    function _initialized() private view returns (bool){
         return boolStorage[keccak256("bsf_drop_init")];
     }
- 
-    function txCount(address customer) public view returns(uint) {
-        return uintStorage[keccak256(abi.encodePacked("txcount", customer))];
+
+    function initialized() external view returns (bool) {
+        return _initialized();
     }
 
-    function arrayLimit() public view returns(uint) {
-        return uintStorage[keccak256("arrayLimit")];
+    function _txCount(address customer) internal view returns(uint){
+        return uintStorage[keccak256(abi.encodePacked("bsf_drop_tx_count", customer))];
+    }
+ 
+    function txCount(address customer) external view returns(uint) {
+        return _txCount(customer);
+    }
+
+    function _arrayLimit() internal view returns(uint){
+        return uintStorage[keccak256("bsf_drop_limit_array")];
+    }
+
+    function arrayLimit() external view returns(uint) {
+        return _arrayLimit();
     }
 
     function setArrayLimit(uint _newLimit) public onlyOwner {
         require(_newLimit != 0);
-        uintStorage[keccak256("arrayLimit")] = _newLimit;
+        uintStorage[keccak256("bsf_drop_limit_array")] = _newLimit;
     }
 
-    function discountStep() public view returns(uint) {
-        return uintStorage[keccak256("discountStep")];
+    function _discountStep() internal view returns(uint){
+        uintStorage[keccak256("bsf_drop_step_discount")];
+    }
+
+    function discountStep() external view returns(uint) {
+        return uintStorage[keccak256("bsf_drop_step_discount")];
     }
 
     function setDiscountStep(uint _newStep) public onlyOwner {
         require(_newStep != 0);
-        uintStorage[keccak256("discountStep")] = _newStep;
+        uintStorage[keccak256("bsf_drop_step_discount")] = _newStep;
     }
 
     function fee() public view returns(uint) {
-        return uintStorage[keccak256("fee")];
+        return uintStorage[keccak256("bsf_drop_fee")];
     }
 
     function currentFee(address _customer) public view returns(uint) {
@@ -71,12 +87,12 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
 
     function setFee(uint _newStep) public onlyOwner {
         require(_newStep != 0);
-        uintStorage[keccak256("fee")] = _newStep;
+        uintStorage[keccak256("bsf_drop_fee")] = _newStep;
     }
 
     function discountRate(address _customer) public view returns(uint) {
-        uint count = txCount(_customer);
-        return count.mul(discountStep());
+        uint count = _txCount(_customer);
+        return count.mul(_discountStep());
     }
 
     function multisendToken(address token, address[] calldata _contributors, uint[] calldata _balances) public hasFee payable {
@@ -84,15 +100,15 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
             multisendEther(_contributors, _balances);
         } else {
             uint total = 0;
-            require(_contributors.length <= arrayLimit());
+            require(_contributors.length <= _arrayLimit());
             IBEP20 IBEP20token = IBEP20(token);
             uint8 i = 0;
             for (i; i < _contributors.length; i++) {
                 IBEP20token.transferFrom(msg.sender, _contributors[i], _balances[i]);
                 total += _balances[i];
             }
-            setTxCount(msg.sender, txCount(msg.sender).add(1));
-            emit Multisended(total, token);
+            setTxCount(msg.sender, _txCount(msg.sender).add(1));
+            emit DropSent(total, token);
         }
     }
 
@@ -100,7 +116,7 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
         uint total = msg.value;
         uint fee_ = currentFee(msg.sender);
         require(total >= fee_);
-        require(_contributors.length <= arrayLimit());
+        require(_contributors.length <= _arrayLimit());
         total = total.sub(fee_);
         uint i = 0;
         for (i; i < _contributors.length; i++) {
@@ -108,8 +124,8 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
             total = total.sub(_balances[i]);
             payable(_contributors[i]).transfer(_balances[i]);
         }
-        setTxCount(msg.sender, txCount(msg.sender).add(1));
-        emit Multisended(msg.value, 0x000000000000000000000000000000000000bEEF);
+        setTxCount(msg.sender, _txCount(msg.sender).add(1));
+        emit DropSent(msg.value, 0x000000000000000000000000000000000000bEEF);
     }
 
     function claimTokens(address _token) public onlyOwner {
@@ -123,8 +139,7 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
         emit ClaimedTokens(_token, owner(), balance);
     }
     
-    function setTxCount(address customer, uint _txCount) private {
-        uintStorage[keccak256(abi.encodePacked("txCount", customer))] = _txCount;
+    function setTxCount(address customer, uint txCount_) private {
+        uintStorage[keccak256(abi.encodePacked("bsf_drop_tx_count", customer))] = txCount_;
     }
-
 }
