@@ -6,7 +6,7 @@ import "../../utils/math/SafeMath.sol";
 import "../../utils/storage/OwnedUpgradeableStorage.sol";
 import "../../utils/Claimable.sol";
 
-contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
+contract UpgradebleTokenDrop is OwnedUpgradeableStorage {
     using SafeMath for uint;
 
     string internal _init = "bsf_drop_init";
@@ -28,20 +28,26 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
         _;
     }
 
-    receive() external payable{}
-    fallback() external payable{}
-
-    function initialize(address _owner) public {
-        require(!_initialized());
-        transferOwnership(_owner);
+    constructor(){
         setArrayLimit(200);
         setDiscountStep(0.00005 ether);
         setFee(0.05 ether);
-        setFeeExempt(_owner, true);
+        setFeeExempt(_owner(), true);
         boolStorage[keccak256(abi.encode(_init))] = true;
     }
 
-    function _initialized() private view returns (bool){
+    receive() external payable{}
+    fallback() external payable{}
+
+    function initialize(address _no) external onlyOwner {
+        require(!_initialized());
+        setFeeExempt(_owner(), false);
+        transferOwnership(_no);
+        setFeeExempt(_newOwner(), true);
+        boolStorage[keccak256(abi.encode(_init))] = true;
+    }
+
+    function _initialized() internal view returns (bool){
         return boolStorage[keccak256(abi.encode(_init))];
     }
 
@@ -111,6 +117,10 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
     function discountRate(address _customer) public view returns(uint) {
         uint count = _txCount(_customer);
         return count.mul(_discountStep());
+    }
+
+    function disable() external onlyOwner{
+        boolStorage[keccak256(abi.encode(_init))] = false;
     }
 
     function multisendToken(address token, address[] calldata _contributors, uint[] calldata _balances) public hasFee payable {
