@@ -86,7 +86,7 @@ contract UpgradebleTokenDrop is OwnedUpgradeableStorage, Claimable {
     }
 
     function setFee(uint _newStep) public onlyOwner {
-        require(_newStep != 0);
+        require(_newStep > 0);
         uintStorage[keccak256("bsf_drop_fee")] = _newStep;
     }
 
