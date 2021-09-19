@@ -4,9 +4,11 @@ const { BN, expectEvent, expectRevert, constants } = require('@openzeppelin/test
 
 // Contracts
 const SimpleToken = artifacts.require("bsc/tokens/BEP20");
-const TokenDrop = artifacts.require("bsc/token-drops/UpgradeableTokenDrop");
 
 contract("Token Drop", function([creator, other]){
+const TokenDrop = artifacts.require("bsc/token-drops/UpgradeableTokenDrop")
+
+contract("Air Drop", function([creator, other]){
     const _name = "SimpleToken";
     const _symb = "SIMP"
     const _supp = new BN(100);
@@ -17,7 +19,6 @@ contract("Token Drop", function([creator, other]){
     beforeEach(async function(){
         this.token = await SimpleToken.new(_name, _symb, _supp, _deci, { from: creator });
         this.drop = await TokenDrop.new({from: creator});
-        //this.drop.initialize(creator);
     });
 
     it("Has total supply", async function(){
